@@ -1,0 +1,233 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Docker Compose configuration for on-premise deployment
+# This file provides a complete stack for running the agent locally
+
+version: '3.8'
+
+services:
+  # Main application container
+  agent-app:
+    build:
+      context: ../../../..
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      # LLM Configuration
+      - LLM_ENDPOINT_URL=${LLM_ENDPOINT_URL}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME}
+      - LLM_API_KEY=${LLM_API_KEY}
+
+      # Embedding Configuration (for RAG)
+      - EMBEDDING_ENDPOINT_URL=${EMBEDDING_ENDPOINT_URL:-${LLM_ENDPOINT_URL}}
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}
+
+      # Database Configuration
+      - DATABASE_URL=${DATABASE_URL:-postgresql://agent_user:changeme@postgres:5432/agent_db}
+      - DB_USER=${DB_USER:-agent_user}
+      - DB_PASS=${DB_PASS:-changeme}
+      - DB_NAME=${DB_NAME:-agent_db}
+
+      # Storage Configuration
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_ENDPOINT_URL=${STORAGE_ENDPOINT_URL}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - LOCAL_STORAGE_PATH=${LOCAL_STORAGE_PATH:-/data/storage}
+
+      # Vector Database Configuration (for RAG)
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
+      - VECTOR_DB_URL=${VECTOR_DB_URL:-http://chroma:8000}
+      - VECTOR_DB_PATH=${VECTOR_DB_PATH:-/data/chroma}
+
+      # Logging Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_FILE_PATH=${LOG_FILE_PATH:-/var/log/agent.log}
+      - LOKI_URL=${LOKI_URL}
+
+      # Tracing Configuration
+      - ENABLE_TRACING=${ENABLE_TRACING:-false}
+      - TRACING_BACKEND=${TRACING_BACKEND:-jaeger}
+      - JAEGER_ENDPOINT=${JAEGER_ENDPOINT:-http://jaeger:14268/api/traces}
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=${OTEL_EXPORTER_JAEGER_ENDPOINT:-http://jaeger:14250}
+
+      # Application Settings
+      - APP_HOST=${APP_HOST:-0.0.0.0}
+      - APP_PORT=${APP_PORT:-8000}
+      - AGENT_VERSION=${AGENT_VERSION:-0.1.0}
+    volumes:
+      - agent-storage:/data/storage
+      - agent-logs:/var/log
+      - chroma-data:/data/chroma
+    depends_on:
+{% if cookiecutter.session_type == "cloud_sql" or cookiecutter.session_type == "in_memory" -%}
+      - postgres
+{%- endif %}
+{% if cookiecutter.agent_name == "agentic_rag" -%}
+      - chroma
+{%- endif %}
+    networks:
+      - agent-network
+    restart: unless-stopped
+
+  # PostgreSQL Database (for session state)
+{% if cookiecutter.session_type == "cloud_sql" or cookiecutter.session_type == "in_memory" -%}
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${DB_USER:-agent_user}
+      - POSTGRES_PASSWORD=${DB_PASS:-changeme}
+      - POSTGRES_DB=${DB_NAME:-agent_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agent-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agent_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+{%- endif %}
+
+{% if cookiecutter.agent_name == "agentic_rag" -%}
+  # Chroma Vector Database (for RAG document retrieval)
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8002:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=${CHROMA_TELEMETRY:-false}
+    networks:
+      - agent-network
+    restart: unless-stopped
+{%- endif %}
+
+  # MinIO Object Storage (optional - for production storage needs)
+  # Uncomment to use MinIO instead of local filesystem
+  # minio:
+  #   image: minio/minio:latest
+  #   command: server /data --console-address ":9001"
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   environment:
+  #     - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+  #     - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+  #   volumes:
+  #     - minio-data:/data
+  #   networks:
+  #     - agent-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     timeout: 20s
+  #     retries: 3
+
+  # Jaeger Tracing (optional - for distributed tracing)
+  # Uncomment to enable tracing and set ENABLE_TRACING=true
+  # jaeger:
+  #   image: jaegertracing/all-in-one:latest
+  #   ports:
+  #     - "5775:5775/udp"
+  #     - "6831:6831/udp"
+  #     - "6832:6832/udp"
+  #     - "5778:5778"
+  #     - "16686:16686"  # Jaeger UI
+  #     - "14250:14250"  # gRPC
+  #     - "14268:14268"  # HTTP
+  #     - "14269:14269"  # Admin port
+  #   environment:
+  #     - COLLECTOR_OTLP_ENABLED=true
+  #   networks:
+  #     - agent-network
+  #   restart: unless-stopped
+
+  # Grafana Loki (optional - for log aggregation)
+  # Uncomment to enable centralized logging
+  # loki:
+  #   image: grafana/loki:latest
+  #   ports:
+  #     - "3100:3100"
+  #   command: -config.file=/etc/loki/local-config.yaml
+  #   networks:
+  #     - agent-network
+  #   restart: unless-stopped
+
+  # Grafana (optional - for observability dashboards)
+  # Uncomment to enable dashboards for metrics, logs, and traces
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+  #     - GF_USERS_ALLOW_SIGN_UP=false
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #   networks:
+  #     - agent-network
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - loki
+  #     - jaeger
+
+  # vLLM Server (optional - for local LLM inference)
+  # Uncomment to run a local LLM instead of using external endpoint
+  # Requires NVIDIA GPU with Docker GPU support
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   ports:
+  #     - "8001:8000"
+  #   environment:
+  #     - HF_TOKEN=${HF_TOKEN}  # HuggingFace token for model download
+  #     - VLLM_API_KEY=${VLLM_API_KEY:-secret-token-change-me}
+  #   command: >
+  #     --model meta-llama/Llama-3.1-8B-Instruct
+  #     --dtype auto
+  #     --max-model-len 8192
+  #     --api-key ${VLLM_API_KEY:-secret-token-change-me}
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   networks:
+  #     - agent-network
+  #   restart: unless-stopped
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+{% if cookiecutter.agent_name == "agentic_rag" -%}
+  chroma-data:
+{%- endif %}
+  agent-storage:
+  agent-logs:
+  # minio-data:  # Uncomment if using MinIO
+  # grafana-data:  # Uncomment if using Grafana
