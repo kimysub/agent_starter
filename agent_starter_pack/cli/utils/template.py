@@ -324,6 +324,10 @@ def prompt_deployment_target(
             "display_name": "Cloud Run",
             "description": "GCP Serverless container execution",
         },
+        "on_premise": {
+            "display_name": "On-Premise",
+            "description": "Local deployment with Docker Compose and local LLMs",
+        },
     }
 
     if not targets:

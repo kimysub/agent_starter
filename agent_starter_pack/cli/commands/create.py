@@ -105,7 +105,7 @@ def shared_template_options(f: Callable) -> Callable:
     f = click.option(
         "--deployment-target",
         "-d",
-        type=click.Choice(["agent_engine", "cloud_run"]),
+        type=click.Choice(["agent_engine", "cloud_run", "on_premise"]),
         help="Deployment target name",
     )(f)
     f = click.option(
@@ -621,7 +621,15 @@ def create(
                 )
                 return
 
-            if (
+            if final_deployment == "on_premise":
+                # On-premise only supports in-memory sessions currently
+                final_session_type = "in_memory"
+                if session_type and session_type != "in_memory":
+                    console.print(
+                        "Info: On-premise deployment currently only supports in-memory sessions. Using 'in_memory'.",
+                        style="yellow",
+                    )
+            elif (
                 final_deployment is not None
                 and final_deployment in ("cloud_run")
                 and not session_type
@@ -647,9 +655,14 @@ def create(
         if debug and final_session_type:
             logging.debug(f"Selected session type: {final_session_type}")
 
-        # CI/CD runner selection
+        # CI/CD runner selection (skip for on_premise)
         final_cicd_runner = cicd_runner
-        if not final_cicd_runner:
+        if final_deployment == "on_premise":
+            # On-premise doesn't require CI/CD runner selection
+            final_cicd_runner = None
+            if debug:
+                logging.debug("Skipping CI/CD runner selection for on_premise deployment")
+        elif not final_cicd_runner:
             if auto_approve or agent_garden:
                 final_cicd_runner = "google_cloud_build"
                 if not agent_garden:
@@ -659,12 +672,13 @@ def create(
                     )
             else:
                 final_cicd_runner = prompt_cicd_runner_selection()
-        if debug:
+        if debug and final_cicd_runner:
             logging.debug(f"Selected CI/CD runner: {final_cicd_runner}")
 
-        # Region confirmation (if not explicitly passed)
+        # Region confirmation (if not explicitly passed and not on_premise)
         if (
-            not auto_approve
+            final_deployment != "on_premise"
+            and not auto_approve
             and ctx.get_parameter_source("region") != ParameterSource.COMMANDLINE
         ):
             # Show Agent Engine supported regions link if agent_garden flag is set
@@ -677,27 +691,30 @@ def create(
         if debug:
             logging.debug(f"Selected region: {region}")
 
-        # GCP Setup
-        logging.debug("Setting up GCP...")
-
+        # GCP Setup (skip for on_premise deployment)
         creds_info = {}
-        if not skip_checks:
-            # Set up GCP environment
-            try:
-                creds_info = setup_gcp_environment(
-                    auto_approve=auto_approve,
-                    skip_checks=skip_checks,
-                    region=region,
-                    debug=debug,
-                    agent_garden=agent_garden,
-                )
-            except Exception as e:
-                if debug:
-                    logging.warning(f"GCP environment setup failed: {e}")
-                console.print(f"> ⚠️  {e}", style="bold yellow")
-                console.print(
-                    "> Continuing with template processing...", style="yellow"
-                )
+        if final_deployment != "on_premise":
+            logging.debug("Setting up GCP...")
+
+            if not skip_checks:
+                # Set up GCP environment
+                try:
+                    creds_info = setup_gcp_environment(
+                        auto_approve=auto_approve,
+                        skip_checks=skip_checks,
+                        region=region,
+                        debug=debug,
+                        agent_garden=agent_garden,
+                    )
+                except Exception as e:
+                    if debug:
+                        logging.warning(f"GCP environment setup failed: {e}")
+                    console.print(f"> ⚠️  {e}", style="bold yellow")
+                    console.print(
+                        "> Continuing with template processing...", style="yellow"
+                    )
+        else:
+            logging.debug("Skipping GCP setup for on_premise deployment")
 
         # Process template
         if not template_source_path:
