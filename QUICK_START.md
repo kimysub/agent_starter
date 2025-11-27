@@ -148,12 +148,25 @@ cd agent-starter-pack
 # Install dependencies
 make install
 
-# Create a new agent project with on-premise configuration
-# Note: This will be updated when on_premise deployment target is implemented
-uv run agent-starter-pack create my-local-agent --output-dir ./my-agent
+# Generate lock files for on_premise deployment (one-time setup)
+make generate-lock
+
+# Create a new agent project with on-premise deployment target
+# This automatically skips GCP prompts and configures local infrastructure
+uv run agent-starter-pack create my-local-agent \
+  --agent adk_base \
+  --deployment-target on_premise \
+  --output-dir ./my-agent
 
 cd my-agent
 ```
+
+**Note**: The `--deployment-target on_premise` option automatically:
+- Skips GCP credential verification
+- Skips region selection
+- Sets session type to `in_memory`
+- Skips CI/CD runner selection
+- Includes LiteLLM dependencies for OpenAI-compatible endpoints
 
 ### Step 4: Configure Environment Variables
 
@@ -202,11 +215,11 @@ APP_PORT=8000
 EOF
 ```
 
-### Step 5: Update Agent Code for OpenAI-Compatible LLM (ADK + LiteLLM)
+### Step 5: Verify Agent Code (Already Configured!)
 
-**✅ VALIDATED APPROACH**: Use ADK's built-in LiteLLM support for seamless OpenAI-compatible endpoint integration.
+**✅ VALIDATED APPROACH**: The `on_premise` deployment target automatically configures ADK with LiteLLM support.
 
-Edit your agent file (e.g., `app/agent.py`) to use ADK with LiteLLM:
+Your generated agent file (e.g., `app/agent.py`) should already be configured with ADK + LiteLLM:
 
 ```python
 import os
@@ -250,17 +263,16 @@ app = App(root_agent=root_agent, name="app")
 - **LiteLLM uses provider prefixes**: `xai/grok-4-1-fast`, `openai/gpt-4o-mini`, `ollama/llama3.1:8b`
 - Check [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific formats
 
-### Step 6: Install Required Dependencies
+### Step 6: Install Dependencies
+
+**Note**: Dependencies are already configured for on_premise deployment!
 
 ```bash
-# Add ADK, LiteLLM, and local dependencies
-uv add google-adk google-generativeai litellm
+# Install all dependencies (already includes ADK, LiteLLM, FastAPI, Uvicorn)
+uv sync
 
-# Add local storage and vector DB
-uv add chromadb
-
-# If using vector search/RAG
-uv add sentence-transformers langchain-chroma
+# Optional: Add vector DB and embeddings for RAG
+uv add chromadb sentence-transformers langchain-chroma
 ```
 
 ### Step 7: Run Your Agent
