@@ -12,6 +12,7 @@ Key capabilities:
 - Set up CI/CD pipelines for GitHub Actions or Cloud Build (`agent-starter-pack setup-cicd`)
 - **[Partially Complete]** On-premise deployment with local LLMs, storage, and vector databases
   - ✅ LLM integration validated (ADK + LiteLLM with OpenAI-compatible endpoints)
+  - ✅ CLI integration complete (create agents with `--deployment-target on_premise`)
   - 🚧 Storage, vector databases, and observability in progress
 
 ## Development Commands
@@ -75,6 +76,7 @@ The project uses a 4-layer template architecture where later layers override ear
 2. **Deployment Targets** (`agent_starter_pack/deployment_targets/`) - Environment-specific overrides
    - `cloud_run/` - Cloud Run deployment files
    - `agent_engine/` - Agent Engine deployment files
+   - `on_premise/` - On-premise deployment with Docker Compose and local LLMs
 3. **Frontend Types** (`agent_starter_pack/frontends/`) - UI-specific files
    - `adk_live_react/` - React frontend for multimodal Live API agents
 4. **Agent Templates** (`agent_starter_pack/agents/`) - Individual agent implementations
@@ -120,7 +122,7 @@ The project is being extended to support on-premise deployment as an alternative
 
 **Key Constraint**: The ADK framework itself remains unchanged. Only the infrastructure and Google Cloud services are replaced with on-premise alternatives.
 
-**Status**: ✅ Core LLM integration validated | 🚧 Storage, databases, and observability in progress
+**Status**: ✅ Core LLM integration validated | ✅ CLI integration complete | 🚧 Storage, databases, and observability in progress
 
 ### Service Mapping
 
@@ -153,13 +155,33 @@ The project is being extended to support on-premise deployment as an alternative
 - Secret Manager → Environment variables, .env files, or Vault
 - Cloud IAM → Application-level auth, API keys, or mTLS
 
-### New Deployment Target: `on_premise`
+### New Deployment Target: `on_premise` ✅ CLI INTEGRATED
 
-A new deployment target is being created at `agent_starter_pack/deployment_targets/on_premise/` with:
+The `on_premise` deployment target is now available at `agent_starter_pack/deployment_targets/on_premise/` with:
 - Docker Compose configuration
 - Local service initialization
-- Environment variable templates
-- Alternative storage and database implementations
+- Environment variable templates (.env.example)
+- LiteLLM integration for OpenAI-compatible endpoints
+- FastAPI + Uvicorn server
+
+**CLI Usage**:
+```bash
+# Create on-premise agent
+uv run agent-starter-pack create my-local-agent \
+  --agent adk_base \
+  --deployment-target on_premise \
+  --output-dir ./my-agent
+
+# No GCP prompts - skips region, credentials, session type, and CI/CD selection
+# Automatically uses in-memory sessions and LiteLLM dependencies
+```
+
+**Key Differences from GCP Deployments**:
+- No GCP credential verification
+- No region selection (not needed for local deployment)
+- No CI/CD runner selection (not needed for local deployment)
+- Session type fixed to `in_memory` (Cloud SQL and Agent Engine are GCP-only)
+- Dependencies use `litellm` instead of `google-cloud-aiplatform`
 
 ### ADK + OpenAI-Compatible LLM Integration ✅ VALIDATED
 
@@ -206,10 +228,18 @@ agent = Agent(
 - `.env.example` - Environment variable template
 - `config/local.yaml` - Local deployment configuration
 
-**CLI Updates:**
-- `cli/commands/create.py` - Add `on_premise` deployment target
-- `cli/commands/enhance.py` - Support on-premise enhancement
-- `cli/utils/gcp.py` → May need refactoring to `cli/utils/infrastructure.py`
+**CLI Updates** ✅ COMPLETED:
+- `cli/commands/create.py` - Added `on_premise` to deployment target choices, skips GCP prompts
+- `cli/utils/template.py` - Added on-premise display info to deployment target prompts
+- `agents/adk_base/.template/templateconfig.yaml` - Added `on_premise` to deployment_targets
+- `base_template/pyproject.toml` - Added on_premise dependencies (litellm, fastapi, uvicorn)
+
+**Lock File Generation**:
+After adding or modifying on_premise dependencies, run:
+```bash
+make generate-lock
+```
+This creates `agent_starter_pack/resources/locks/uv-adk_base-on_premise.lock`
 
 ### Environment Variables for On-Premise
 

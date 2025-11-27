@@ -22,6 +22,10 @@ dependencies = [
 {%- elif cookiecutter.deployment_target == 'agent_engine' %}
     "google-cloud-aiplatform[evaluation,agent-engines]>=1.118.0,<2.0.0",
     "protobuf>=6.31.1,<7.0.0",
+{%- elif cookiecutter.deployment_target == 'on_premise' %}
+    "litellm>=1.53.9,<2.0.0",
+    "fastapi~=0.115.8",
+    "uvicorn~=0.34.0",
 {%- endif %}
 ]
 requires-python = ">=3.10,<3.14"

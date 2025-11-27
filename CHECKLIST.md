@@ -555,16 +555,36 @@ This document provides a comprehensive checklist for migrating the Agent Starter
   - **Override files**:
     - [ ] Override Cloud Run specific files with Docker equivalents
 
-### 8.3 CLI Command Updates
+### 8.3 CLI Command Updates ✅ PARTIALLY COMPLETED
 
-- [ ] **Update CLI commands for on-premise**
-  - **Files to modify**:
-    - [ ] `agent_starter_pack/cli/commands/create.py`
-      - [ ] Add `on_premise` as deployment target option
-    - [ ] `agent_starter_pack/cli/commands/enhance.py`
-      - [ ] Support on-premise enhancement
-    - [ ] `agent_starter_pack/cli/commands/setup_cicd.py`
-      - [ ] Add on-premise CI/CD setup (Jenkins, GitLab CI)
+- [x] **Update CLI commands for on-premise** ✅ CREATE COMMAND COMPLETE
+  - **Files modified**:
+    - [x] `agent_starter_pack/cli/commands/create.py`
+      - [x] Added `on_premise` to deployment target choices
+      - [x] Made GCP region prompt conditional (skipped for on_premise)
+      - [x] Made GCP credential setup conditional (skipped for on_premise)
+      - [x] Session type fixed to `in_memory` for on_premise
+      - [x] CI/CD runner selection skipped for on_premise
+    - [x] `agent_starter_pack/cli/utils/template.py`
+      - [x] Added on_premise display info to deployment target prompts
+    - [x] `agent_starter_pack/agents/adk_base/.template/templateconfig.yaml`
+      - [x] Added `on_premise` to deployment_targets list
+    - [x] `agent_starter_pack/base_template/pyproject.toml`
+      - [x] Added on_premise dependencies (litellm, fastapi, uvicorn)
+  - **Usage**:
+    ```bash
+    # Create on-premise agent (no GCP prompts!)
+    uv run agent-starter-pack create my-local-agent \
+      --agent adk_base \
+      --deployment-target on_premise \
+      --output-dir ./my-agent
+
+    # Generate lock files after dependency changes
+    make generate-lock
+    ```
+  - **Still TODO**:
+    - [ ] `agent_starter_pack/cli/commands/enhance.py` - Support on-premise enhancement
+    - [ ] `agent_starter_pack/cli/commands/setup_cicd.py` - Add on-premise CI/CD (optional)
   - **New CLI commands to consider**:
     - [ ] `agent-starter-pack deploy-local` - Deploy to local Docker
     - [ ] `agent-starter-pack setup-infra` - Set up local infrastructure (DB, vector DB, MinIO)
