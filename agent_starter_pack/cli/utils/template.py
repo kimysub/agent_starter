@@ -211,6 +211,9 @@ def get_available_agents(deployment_target: str | None = None) -> dict:
     Args:
         deployment_target: Optional deployment target to filter agents
     """
+    # SIMPLIFIED: Only show adk_a2a_base agent
+    ALLOWED_AGENTS = ["adk_a2a_base"]
+
     # Define priority agents that should appear first
     PRIORITY_AGENTS = [
         "adk_base",
@@ -232,6 +235,10 @@ def get_available_agents(deployment_target: str | None = None) -> dict:
                     with open(template_config_path, encoding="utf-8") as f:
                         config = yaml.safe_load(f)
                     agent_name = agent_dir.name
+
+                    # SIMPLIFIED: Only allow adk_a2a_base
+                    if agent_name not in ALLOWED_AGENTS:
+                        continue
 
                     # Skip if deployment target specified and agent doesn't support it
                     if deployment_target:

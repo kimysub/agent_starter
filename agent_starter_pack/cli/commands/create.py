@@ -105,7 +105,8 @@ def shared_template_options(f: Callable) -> Callable:
     f = click.option(
         "--deployment-target",
         "-d",
-        type=click.Choice(["agent_engine", "cloud_run", "on_premise"]),
+        type=click.Choice(["on_premise"]),
+        default="on_premise",
         help="Deployment target name",
     )(f)
     f = click.option(
