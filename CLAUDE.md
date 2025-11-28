@@ -4,16 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-The **Agent Starter Pack** is a Python CLI package that generates production-ready GenAI agent projects. Originally designed for Google Cloud, the project is being extended to support on-premise deployment with local infrastructure alternatives. It uses a sophisticated templating system based on Cookiecutter and Jinja2 to scaffold complete agent projects with infrastructure, CI/CD, and deployment configurations.
+The **Agent Starter Pack** is a Python CLI package that generates production-ready GenAI agent projects with Agent2Agent (A2A) protocol support. The project has been **simplified and optimized for on-premise deployment** with local infrastructure alternatives. It uses a sophisticated templating system based on Cookiecutter and Jinja2 to scaffold complete agent projects.
+
+**Current Focus**: On-premise Agent2Agent (A2A) deployment with LiteLLM
 
 Key capabilities:
-- Generate agent projects from templates (`uvx agent-starter-pack create`)
-- Enhance existing projects with deployment infrastructure (`uvx agent-starter-pack enhance`)
-- Set up CI/CD pipelines for GitHub Actions or Cloud Build (`agent-starter-pack setup-cicd`)
-- **[Partially Complete]** On-premise deployment with local LLMs, storage, and vector databases
-  - ✅ LLM integration validated (ADK + LiteLLM with OpenAI-compatible endpoints)
-  - ✅ CLI integration complete (create agents with `--deployment-target on_premise`)
-  - 🚧 Storage, vector databases, and observability in progress
+- ✅ Generate A2A-enabled agent projects (`uvx agent-starter-pack create`)
+- ✅ **Simplified CLI**: Only `adk_a2a_base` agent + `on_premise` deployment target
+- ✅ **Agent2Agent Protocol**: Full A2A support using `google.adk.a2a.utils.agent_to_a2a`
+- ✅ **LiteLLM Integration**: Works with 100+ providers (OpenAI, vLLM, Ollama, X.AI, etc.)
+- ✅ **Environment-based Configuration**: Uses `.env` files with `python-dotenv`
+- 🚧 Storage, vector databases, and observability in progress
 
 ## Development Commands
 
@@ -80,11 +81,16 @@ The project uses a 4-layer template architecture where later layers override ear
 3. **Frontend Types** (`agent_starter_pack/frontends/`) - UI-specific files
    - `adk_live_react/` - React frontend for multimodal Live API agents
 4. **Agent Templates** (`agent_starter_pack/agents/`) - Individual agent implementations
-   - `adk_base/` - ReAct agent using Google's Agent Development Kit
-   - `adk_a2a_base/` - ADK agent with Agent2Agent protocol support
-   - `agentic_rag/` - RAG agent with Vertex AI Search/Vector Search
-   - `langgraph_base/` - ReAct agent using LangChain's LangGraph
-   - `adk_live/` - Real-time multimodal agent with audio/video/text
+   - **`adk_a2a_base/` (PRIMARY)** - ADK agent with Agent2Agent protocol + LiteLLM support
+     - Uses `google.adk.a2a.utils.agent_to_a2a` for A2A conversion
+     - Supports 100+ LLM providers via LiteLLM
+     - Environment-based configuration with `.env` files
+   - `adk_base/` - ReAct agent using Google's Agent Development Kit (legacy)
+   - `agentic_rag/` - RAG agent with Vertex AI Search/Vector Search (GCP only)
+   - `langgraph_base/` - ReAct agent using LangChain's LangGraph (GCP only)
+   - `adk_live/` - Real-time multimodal agent with audio/video/text (GCP only)
+
+   **Note**: CLI is simplified to only show `adk_a2a_base` for on-premise deployment
 
 ### Template Processing Flow
 
@@ -164,14 +170,18 @@ The `on_premise` deployment target is now available at `agent_starter_pack/deplo
 - LiteLLM integration for OpenAI-compatible endpoints
 - FastAPI + Uvicorn server
 
-**CLI Usage**:
+**CLI Usage** (Simplified):
 ```bash
-# Create on-premise agent
-uv run agent-starter-pack create my-local-agent \
-  --agent adk_base \
+# Create on-premise A2A agent (simplified - only one option available)
+uv run agent-starter-pack create my-agent --output-dir ./my-agent
+
+# Or explicitly specify (same result):
+uv run agent-starter-pack create my-agent \
+  --agent adk_a2a_base \
   --deployment-target on_premise \
   --output-dir ./my-agent
 
+# CLI now only shows adk_a2a_base agent + on_premise deployment
 # No GCP prompts - skips region, credentials, session type, and CI/CD selection
 # Automatically uses in-memory sessions and LiteLLM dependencies
 ```
@@ -183,39 +193,45 @@ uv run agent-starter-pack create my-local-agent \
 - Session type fixed to `in_memory` (Cloud SQL and Agent Engine are GCP-only)
 - Dependencies use `litellm` instead of `google-cloud-aiplatform`
 
-### ADK + OpenAI-Compatible LLM Integration ✅ VALIDATED
+### ADK + Agent2Agent (A2A) Protocol ✅ COMPLETED
 
-**Key Finding**: ADK has built-in support for OpenAI-compatible endpoints via `google.adk.models.lite_llm.LiteLlm`.
+**Implementation Pattern** (based on [a2aproject/a2a-samples](https://github.com/a2aproject/a2a-samples)):
 
-**Solution**:
 ```python
-from google.adk.models.lite_llm import LiteLlm
 from google.adk.agents import Agent
+from google.adk.models.lite_llm import LiteLlm
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from dotenv import load_dotenv
 
-# Create LiteLlm instance with OpenAI-compatible endpoint
+load_dotenv()
+
+# LiteLLM for OpenAI-compatible endpoints
 llm = LiteLlm(
-    model=os.getenv("LLM_MODEL_NAME"),      # e.g., "xai/grok-4-1-fast"
-    api_key=os.getenv("LLM_API_KEY"),
-    api_base=os.getenv("LLM_ENDPOINT_URL"), # e.g., "https://api.x.ai/v1"
+    model=os.getenv("LLM_MODEL_NAME", "openai/llama-3.1-8b"),
+    api_key=os.getenv("LLM_API_KEY", "not-needed"),
+    api_base=os.getenv("LLM_ENDPOINT_URL", "http://localhost:8001/v1"),
 )
 
-# Pass LiteLlm instance directly to Agent
-agent = Agent(
+# Create ADK agent
+root_agent = Agent(
     name="root_agent",
-    model=llm,  # Use LiteLlm instance, not string!
-    instruction="...",
+    model=llm,  # Use LiteLlm instance
+    description="An agent that can provide information.",
+    instruction="You are a helpful AI assistant.",
     tools=[...],
 )
+
+# Convert to A2A application - enables agent-to-agent communication!
+a2a_app = to_a2a(root_agent, port=int(os.getenv("PORT", "8001")))
 ```
 
-**Supported Providers** (via LiteLLM):
-- **Local**: vLLM, Ollama, Text Generation Inference, LocalAI
-- **Cloud**: OpenAI, X.AI, Anthropic, Azure OpenAI, Cohere, etc.
-- **100+ total providers** through LiteLLM's unified interface
+**Key Components**:
+- ✅ **LiteLLM**: Supports 100+ providers (vLLM, Ollama, OpenAI, X.AI, etc.)
+- ✅ **A2A Protocol**: Agent-to-agent communication via `to_a2a()`
+- ✅ **Environment Config**: Uses `.env` files with `python-dotenv`
+- ✅ **Portability**: Same code works with any OpenAI-compatible endpoint
 
-**No Custom Wrapper Needed**: ADK's native `LiteLlm` class handles all provider compatibility internally.
-
-**Tested Successfully**: Validated with X.AI Grok endpoint on 2025-01-26.
+**Reference**: [a2aproject/a2a-samples/adk_facts](https://github.com/a2aproject/a2a-samples/tree/main/samples/python/agents/adk_facts)
 
 ### Key Files for On-Premise Work
 
@@ -229,17 +245,19 @@ agent = Agent(
 - `config/local.yaml` - Local deployment configuration
 
 **CLI Updates** ✅ COMPLETED:
-- `cli/commands/create.py` - Added `on_premise` to deployment target choices, skips GCP prompts
-- `cli/utils/template.py` - Added on-premise display info to deployment target prompts
-- `agents/adk_base/.template/templateconfig.yaml` - Added `on_premise` to deployment_targets
-- `base_template/pyproject.toml` - Added on_premise dependencies (litellm, fastapi, uvicorn)
+- `cli/commands/create.py` - Simplified to only allow `on_premise` deployment target
+- `cli/utils/template.py` - Filtered to only show `adk_a2a_base` agent
+- `agents/adk_a2a_base/.template/templateconfig.yaml` - Added `on_premise` to deployment_targets
+- `agents/adk_a2a_base/app/agent.py` - Updated to use A2A pattern from a2a-samples
+- `deployment_targets/on_premise/agents/adk_a2a_base/app/agent.py` - Created with LiteLLM + A2A
+- `base_template/pyproject.toml` - Added on_premise dependencies (litellm, fastapi, uvicorn, python-dotenv)
 
 **Lock File Generation**:
-After adding or modifying on_premise dependencies, run:
+After adding or modifying dependencies, run:
 ```bash
 make generate-lock
 ```
-This creates `agent_starter_pack/resources/locks/uv-adk_base-on_premise.lock`
+This creates `agent_starter_pack/resources/locks/uv-adk_a2a_base-on_premise.lock`
 
 ### Environment Variables for On-Premise
 

@@ -1,6 +1,6 @@
-# Quick Start: On-Premise Deployment
+# Quick Start: On-Premise A2A Agent Deployment
 
-This guide will help you get started with running the Agent Starter Pack on-premise using local infrastructure instead of Google Cloud services.
+This guide will help you get started with running **Agent2Agent (A2A) enabled agents** on-premise using local infrastructure and OpenAI-compatible LLMs.
 
 ## Prerequisites
 
@@ -151,22 +151,26 @@ make install
 # Generate lock files for on_premise deployment (one-time setup)
 make generate-lock
 
-# Create a new agent project with on-premise deployment target
-# This automatically skips GCP prompts and configures local infrastructure
-uv run agent-starter-pack create my-local-agent \
-  --agent adk_base \
-  --deployment-target on_premise \
-  --output-dir ./my-agent
+# Create a new A2A agent project (simplified - only one option!)
+# CLI automatically uses: adk_a2a_base + on_premise deployment
+uv run agent-starter-pack create my-agent --output-dir ./my-agent
 
 cd my-agent
 ```
 
-**Note**: The `--deployment-target on_premise` option automatically:
+**What gets created:**
+- ✅ **Agent2Agent (A2A) enabled agent** using `google.adk.a2a.utils.agent_to_a2a`
+- ✅ **LiteLLM integration** - works with 100+ providers (OpenAI, vLLM, Ollama, X.AI, etc.)
+- ✅ **Environment-based config** - uses `.env` files with `python-dotenv`
+- ✅ **Docker Compose** ready for local deployment
+- ✅ **FastAPI + Uvicorn** server included
+
+**Note**: The CLI is simplified to only create `adk_a2a_base` agents with `on_premise` deployment:
 - Skips GCP credential verification
 - Skips region selection
 - Sets session type to `in_memory`
 - Skips CI/CD runner selection
-- Includes LiteLLM dependencies for OpenAI-compatible endpoints
+- Automatically includes all A2A and LiteLLM dependencies
 
 ### Step 4: Configure Environment Variables
 
@@ -215,23 +219,22 @@ APP_PORT=8000
 EOF
 ```
 
-### Step 5: Verify Agent Code (Already Configured!)
+### Step 5: Verify A2A Agent Code (Already Configured!)
 
-**✅ VALIDATED APPROACH**: The `on_premise` deployment target automatically configures ADK with LiteLLM support.
+**✅ AGENT2AGENT PATTERN**: The generated agent uses the proper A2A pattern from [a2aproject/a2a-samples](https://github.com/a2aproject/a2a-samples).
 
-Your generated agent file (`app/agent.py`) is **already configured** with the correct LiteLLM setup:
+Your generated agent file (`app/agent.py`) is **already configured** with LiteLLM + A2A:
 
 ```python
 import datetime
 import os
 from zoneinfo import ZoneInfo
 
-from dotenv import load_dotenv
 from google.adk.agents import Agent
-from google.adk.apps.app import App
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
-# Load environment variables from .env file
+from dotenv import load_dotenv
 load_dotenv()
 
 # Get LLM configuration from environment variables
@@ -246,7 +249,6 @@ llm = LiteLlm(
     api_key=llm_api_key,
     api_base=llm_endpoint,
 )
-
 
 def get_weather(query: str) -> str:
     """Simulates a web search. Use it get information on weather.
@@ -281,24 +283,26 @@ def get_current_time(query: str) -> str:
     return f"The current time for query {query} is {now.strftime('%Y-%m-%d %H:%M:%S %Z%z')}"
 
 
-# Create agent with LiteLLM - works with 100+ LLM providers!
+# Create ADK agent with A2A protocol support
 root_agent = Agent(
     name="root_agent",
-    model=llm,  # Use ADK's built-in LiteLlm
+    model=llm,
+    description="An agent that can provide information about the weather and time.",
     instruction="You are a helpful AI assistant designed to provide accurate and useful information.",
     tools=[get_weather, get_current_time],
 )
 
-app = App(root_agent=root_agent, name="app")
+# Convert ADK agent to A2A application
+# This enables the agent to communicate with other agents using the Agent2Agent protocol
+a2a_app = to_a2a(root_agent, port=int(os.getenv("PORT", "8001")))
 ```
 
-**Key Points:**
-- **✅ Already configured** - No changes needed! This is the actual generated code
-- **No custom wrapper needed** - ADK has native LiteLLM support via `google.adk.models.lite_llm.LiteLlm`
-- **100+ providers supported** through LiteLLM's unified interface
-- **Environment variables** are read from `.env` file you created in Step 4
-- **Includes example tools** - `get_weather` and `get_current_time` for testing
-- **Tested and validated** with X.AI Grok endpoint
+**Key Features:**
+- **✅ Agent2Agent Protocol** - Uses `to_a2a()` to enable agent-to-agent communication
+- **✅ LiteLLM Integration** - Works with 100+ providers (vLLM, Ollama, OpenAI, X.AI, etc.)
+- **✅ Environment Config** - Reads from `.env` file with `python-dotenv`
+- **✅ Example Tools** - Includes `get_weather` and `get_current_time` for testing
+- **✅ Based on a2a-samples** - Follows official patterns from [a2aproject/a2a-samples](https://github.com/a2aproject/a2a-samples)
 
 **To customize:**
 - Add your own tools by defining functions like `get_weather`

@@ -555,39 +555,52 @@ This document provides a comprehensive checklist for migrating the Agent Starter
   - **Override files**:
     - [ ] Override Cloud Run specific files with Docker equivalents
 
-### 8.3 CLI Command Updates ✅ PARTIALLY COMPLETED
+### 8.3 CLI Command Updates ✅ COMPLETED + SIMPLIFIED
 
-- [x] **Update CLI commands for on-premise** ✅ CREATE COMMAND COMPLETE
+- [x] **Simplified CLI for on-premise A2A deployment** ✅ COMPLETE
   - **Files modified**:
     - [x] `agent_starter_pack/cli/commands/create.py`
-      - [x] Added `on_premise` to deployment target choices
+      - [x] **Simplified**: Deployment target restricted to `on_premise` only
+      - [x] Set `default="on_premise"` so users don't need to specify
       - [x] Made GCP region prompt conditional (skipped for on_premise)
       - [x] Made GCP credential setup conditional (skipped for on_premise)
       - [x] Session type fixed to `in_memory` for on_premise
       - [x] CI/CD runner selection skipped for on_premise
     - [x] `agent_starter_pack/cli/utils/template.py`
+      - [x] **Simplified**: Added `ALLOWED_AGENTS = ["adk_a2a_base"]` filter
+      - [x] CLI now only shows `adk_a2a_base` agent
       - [x] Added on_premise display info to deployment target prompts
-    - [x] `agent_starter_pack/agents/adk_base/.template/templateconfig.yaml`
+    - [x] `agent_starter_pack/agents/adk_a2a_base/.template/templateconfig.yaml`
       - [x] Added `on_premise` to deployment_targets list
+    - [x] `agent_starter_pack/agents/adk_a2a_base/app/agent.py`
+      - [x] **Rewritten** to use A2A pattern from [a2aproject/a2a-samples](https://github.com/a2aproject/a2a-samples)
+      - [x] Added `from google.adk.a2a.utils.agent_to_a2a import to_a2a`
+      - [x] Uses LiteLLM with environment variables
+      - [x] Converts agent to A2A app: `a2a_app = to_a2a(root_agent, port=...)`
+    - [x] `agent_starter_pack/deployment_targets/on_premise/agents/adk_a2a_base/app/agent.py`
+      - [x] **Created** with LiteLLM + A2A pattern
+      - [x] Combines OpenAI-compatible endpoints with A2A protocol
     - [x] `agent_starter_pack/base_template/pyproject.toml`
-      - [x] Added on_premise dependencies (litellm, fastapi, uvicorn)
-  - **Usage**:
+      - [x] Added on_premise dependencies (litellm, fastapi, uvicorn, python-dotenv)
+  - **Usage** (Simplified):
     ```bash
-    # Create on-premise agent (no GCP prompts!)
-    uv run agent-starter-pack create my-local-agent \
-      --agent adk_base \
-      --deployment-target on_premise \
-      --output-dir ./my-agent
+    # Create on-premise A2A agent (simplified - only one option!)
+    uv run agent-starter-pack create my-agent --output-dir ./my-agent
+
+    # CLI automatically uses: adk_a2a_base + on_premise deployment
+    # No GCP prompts, no agent selection needed!
 
     # Generate lock files after dependency changes
     make generate-lock
     ```
-  - **Still TODO**:
+  - **Completed Features**:
+    - ✅ Agent2Agent (A2A) protocol integration
+    - ✅ LiteLLM support for 100+ providers
+    - ✅ Simplified CLI (only one agent + one deployment target)
+    - ✅ Environment-based configuration with `.env` files
+  - **Not Implemented** (Not needed for current focus):
     - [ ] `agent_starter_pack/cli/commands/enhance.py` - Support on-premise enhancement
     - [ ] `agent_starter_pack/cli/commands/setup_cicd.py` - Add on-premise CI/CD (optional)
-  - **New CLI commands to consider**:
-    - [ ] `agent-starter-pack deploy-local` - Deploy to local Docker
-    - [ ] `agent-starter-pack setup-infra` - Set up local infrastructure (DB, vector DB, MinIO)
 
 ### 8.4 Cookiecutter Variables
 
