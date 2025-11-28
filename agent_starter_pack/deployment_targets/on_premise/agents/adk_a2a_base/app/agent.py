@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""ADK Agent with Agent2Agent (A2A) Protocol configured for on-premise deployment.
+"""ADK Agent with Agent2Agent (A2A) Protocol for on-premise deployment.
 
-This version uses LiteLLM for OpenAI-compatible endpoints and includes
-Agent2Agent protocol support for agent collaboration.
+This agent combines:
+- LiteLLM for OpenAI-compatible endpoints (vLLM, Ollama, local LLMs, etc.)
+- Agent2Agent (A2A) protocol for agent collaboration
+
+Based on patterns from: https://github.com/a2aproject/a2a-samples
 """
 
 import datetime
@@ -24,7 +27,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent
-from google.adk.apps.app import App
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.models.lite_llm import LiteLlm
 
 # Load environment variables from .env file
@@ -77,13 +80,16 @@ def get_current_time(query: str) -> str:
     return f"The current time for query {query} is {now.strftime('%Y-%m-%d %H:%M:%S %Z%z')}"
 
 
-# Create agent with LiteLLM and A2A support - works with 100+ LLM providers!
+# Create ADK agent with LiteLLM and A2A protocol support
 root_agent = Agent(
     name="root_agent",
-    model=llm,  # Use ADK's built-in LiteLlm
+    model=llm,  # Use LiteLlm instance for OpenAI-compatible endpoints
     description="An agent that can provide information about the weather and time.",
     instruction="You are a helpful AI assistant designed to provide accurate and useful information.",
     tools=[get_weather, get_current_time],
 )
 
-app = App(root_agent=root_agent, name="app")
+# Convert ADK agent to A2A application
+# This enables the agent to communicate with other agents using the Agent2Agent protocol
+# Works with any OpenAI-compatible LLM endpoint (vLLM, Ollama, LocalAI, etc.)
+a2a_app = to_a2a(root_agent, port=int(os.getenv("PORT", "8001")))
