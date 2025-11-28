@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""ADK Agent configured for on-premise deployment with OpenAI-compatible LLMs.
+"""ADK Agent with Agent2Agent (A2A) Protocol configured for on-premise deployment.
 
-This version uses a custom BaseLlm implementation that works with
-OpenAI-compatible API endpoints, completely bypassing google.genai.
+This version uses LiteLLM for OpenAI-compatible endpoints and includes
+Agent2Agent protocol support for agent collaboration.
 """
 
 import datetime
@@ -77,10 +77,11 @@ def get_current_time(query: str) -> str:
     return f"The current time for query {query} is {now.strftime('%Y-%m-%d %H:%M:%S %Z%z')}"
 
 
-# Create agent with LiteLLM - works with 100+ LLM providers!
+# Create agent with LiteLLM and A2A support - works with 100+ LLM providers!
 root_agent = Agent(
     name="root_agent",
     model=llm,  # Use ADK's built-in LiteLlm
+    description="An agent that can provide information about the weather and time.",
     instruction="You are a helpful AI assistant designed to provide accurate and useful information.",
     tools=[get_weather, get_current_time],
 )

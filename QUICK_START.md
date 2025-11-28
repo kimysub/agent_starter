@@ -219,48 +219,94 @@ EOF
 
 **✅ VALIDATED APPROACH**: The `on_premise` deployment target automatically configures ADK with LiteLLM support.
 
-Your generated agent file (e.g., `app/agent.py`) should already be configured with ADK + LiteLLM:
+Your generated agent file (`app/agent.py`) is **already configured** with the correct LiteLLM setup:
 
 ```python
+import datetime
 import os
-from google.adk.models.lite_llm import LiteLlm
+from zoneinfo import ZoneInfo
+
+from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.apps.app import App
+from google.adk.models.lite_llm import LiteLlm
 
-# Create LiteLlm instance with OpenAI-compatible endpoint
-# Works with 100+ providers: OpenAI, X.AI, vLLM, Ollama, Azure, etc.
+# Load environment variables from .env file
+load_dotenv()
+
+# Get LLM configuration from environment variables
+llm_endpoint = os.getenv("LLM_ENDPOINT_URL", "http://localhost:8001/v1")
+llm_model = os.getenv("LLM_MODEL_NAME", "openai/llama-3.1-8b")
+llm_api_key = os.getenv("LLM_API_KEY", "not-needed")
+
+# Use ADK's built-in LiteLLM support!
+# LiteLlm supports 100+ providers: OpenAI, Anthropic, vLLM, Ollama, X.AI, etc.
 llm = LiteLlm(
-    model=os.getenv("LLM_MODEL_NAME"),      # e.g., "xai/grok-4-1-fast" or "llama3.1:8b"
-    api_key=os.getenv("LLM_API_KEY"),       # API key (use "not-needed" for Ollama)
-    api_base=os.getenv("LLM_ENDPOINT_URL"), # e.g., "http://localhost:8001/v1"
+    model=llm_model,
+    api_key=llm_api_key,
+    api_base=llm_endpoint,
 )
 
-# Define your agent tools
-def example_tool(query: str) -> str:
-    """Example tool for the agent."""
-    return f"Tool result for: {query}"
 
-# Create ADK agent with LiteLlm instance
+def get_weather(query: str) -> str:
+    """Simulates a web search. Use it get information on weather.
+
+    Args:
+        query: A string containing the location to get weather information for.
+
+    Returns:
+        A string with the simulated weather information for the queried location.
+    """
+    if "sf" in query.lower() or "san francisco" in query.lower():
+        return "It's 60 degrees and foggy."
+    return "It's 90 degrees and sunny."
+
+
+def get_current_time(query: str) -> str:
+    """Simulates getting the current time for a city.
+
+    Args:
+        city: The name of the city to get the current time for.
+
+    Returns:
+        A string with the current time information.
+    """
+    if "sf" in query.lower() or "san francisco" in query.lower():
+        tz_identifier = "America/Los_Angeles"
+    else:
+        return f"Sorry, I don't have timezone information for query: {query}."
+
+    tz = ZoneInfo(tz_identifier)
+    now = datetime.datetime.now(tz)
+    return f"The current time for query {query} is {now.strftime('%Y-%m-%d %H:%M:%S %Z%z')}"
+
+
+# Create agent with LiteLLM - works with 100+ LLM providers!
 root_agent = Agent(
     name="root_agent",
-    model=llm,  # Pass LiteLlm instance directly!
+    model=llm,  # Use ADK's built-in LiteLlm
     instruction="You are a helpful AI assistant designed to provide accurate and useful information.",
-    tools=[example_tool],
+    tools=[get_weather, get_current_time],
 )
 
-# Create the app
 app = App(root_agent=root_agent, name="app")
 ```
 
 **Key Points:**
-- **No custom wrapper needed** - ADK has native LiteLLM support
+- **✅ Already configured** - No changes needed! This is the actual generated code
+- **No custom wrapper needed** - ADK has native LiteLLM support via `google.adk.models.lite_llm.LiteLlm`
 - **100+ providers supported** through LiteLLM's unified interface
-- **Same code** works with OpenAI, X.AI, vLLM, Ollama, Azure OpenAI, etc.
-- Just change `LLM_ENDPOINT_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY` in `.env`
+- **Environment variables** are read from `.env` file you created in Step 4
+- **Includes example tools** - `get_weather` and `get_current_time` for testing
 - **Tested and validated** with X.AI Grok endpoint
 
+**To customize:**
+- Add your own tools by defining functions like `get_weather`
+- Modify the agent instruction for your use case
+- Change LLM configuration in `.env` file (not in code)
+
 **Model Name Format:**
-- **LiteLLM uses provider prefixes**: `xai/grok-4-1-fast`, `openai/gpt-4o-mini`, `ollama/llama3.1:8b`
+- LiteLLM uses provider prefixes: `openai/gpt-4o-mini`, `xai/grok-4-1-fast`, `ollama/llama3.1:8b`
 - Check [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific formats
 
 ### Step 6: Install Dependencies
@@ -268,7 +314,7 @@ app = App(root_agent=root_agent, name="app")
 **Note**: Dependencies are already configured for on_premise deployment!
 
 ```bash
-# Install all dependencies (already includes ADK, LiteLLM, FastAPI, Uvicorn)
+# Install all dependencies (already includes ADK, LiteLLM, FastAPI, Uvicorn, python-dotenv)
 uv sync
 
 # Optional: Add vector DB and embeddings for RAG
@@ -906,6 +952,592 @@ mc admin policy list local
    - Configure SSL/TLS
    - Implement rate limiting
    - Set up backups
+
+---
+
+## CI/CD Setup (Manual Configuration)
+
+> **Note**: Automated CI/CD setup via `agent-starter-pack setup-cicd` is not yet implemented for on-premise deployment. Use these manual configuration guides instead.
+
+### Option 1: GitHub Actions (Recommended)
+
+GitHub Actions can deploy to on-premise infrastructure using self-hosted runners or SSH deployment.
+
+#### 1A. Using Self-Hosted Runners
+
+**Step 1: Set up a self-hosted runner on your server**
+
+```bash
+# On your deployment server
+mkdir -p ~/actions-runner && cd ~/actions-runner
+
+# Download the latest runner (Linux x64)
+curl -o actions-runner-linux-x64-2.311.0.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.311.0/actions-runner-linux-x64-2.311.0.tar.gz
+
+# Extract
+tar xzf ./actions-runner-linux-x64-2.311.0.tar.gz
+
+# Configure (requires GitHub personal access token)
+./config.sh --url https://github.com/YOUR_USERNAME/YOUR_REPO --token YOUR_RUNNER_TOKEN
+
+# Install as service
+sudo ./svc.sh install
+sudo ./svc.sh start
+```
+
+**Step 2: Create GitHub Actions workflow**
+
+Create `.github/workflows/deploy-on-premise.yml` in your agent project:
+
+```yaml
+name: Deploy to On-Premise
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+      - name: Lint code
+        run: |
+          uv run ruff check .
+          uv run mypy .
+
+  deploy:
+    needs: test
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          cp .env.production .env
+          # Or use GitHub Secrets
+          echo "LLM_ENDPOINT_URL=${{ secrets.LLM_ENDPOINT_URL }}" >> .env
+          echo "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" >> .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+
+      - name: Build Docker image
+        run: |
+          docker build -t my-agent:${{ github.sha }} .
+          docker tag my-agent:${{ github.sha }} my-agent:latest
+
+      - name: Deploy with Docker Compose
+        run: |
+          docker-compose down
+          docker-compose up -d --build
+
+      - name: Wait for health check
+        run: |
+          sleep 10
+          curl -f http://localhost:8000/health || exit 1
+
+      - name: Clean up old images
+        run: docker image prune -f
+```
+
+**Step 3: Add secrets to GitHub**
+
+Go to your GitHub repository → Settings → Secrets and variables → Actions:
+
+```
+LLM_ENDPOINT_URL=http://localhost:8001/v1
+LLM_API_KEY=your-secret-api-key
+DATABASE_URL=postgresql://agent_user:password@localhost:5432/agent_db
+```
+
+#### 1B. Using SSH Deployment (No Self-Hosted Runner)
+
+**Step 1: Set up SSH key**
+
+```bash
+# On your local machine, generate SSH key
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions
+
+# Copy public key to deployment server
+ssh-copy-id -i ~/.ssh/github-actions.pub user@your-server.com
+```
+
+**Step 2: Add SSH private key to GitHub Secrets**
+
+```bash
+# Copy private key content
+cat ~/.ssh/github-actions
+
+# Add to GitHub: Settings → Secrets → SSH_PRIVATE_KEY
+```
+
+**Step 3: Create SSH deployment workflow**
+
+Create `.github/workflows/ssh-deploy.yml`:
+
+```yaml
+name: SSH Deploy to On-Premise
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/my-agent
+            git pull origin main
+            docker-compose down
+            docker-compose up -d --build
+            docker-compose ps
+```
+
+Add these secrets to GitHub:
+- `SSH_HOST`: Your server IP or hostname
+- `SSH_USER`: SSH username
+- `SSH_PRIVATE_KEY`: Private key content
+
+---
+
+### Option 2: Jenkins Pipeline
+
+Jenkins is ideal for on-premise CI/CD with full control over the build environment.
+
+**Step 1: Install Jenkins**
+
+```bash
+# Install Jenkins on Ubuntu/Debian
+wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+sudo apt update
+sudo apt install jenkins
+
+# Start Jenkins
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+
+# Get initial admin password
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+```
+
+Access Jenkins at `http://your-server:8080`
+
+**Step 2: Install required plugins**
+
+- Docker Pipeline
+- Git Plugin
+- Pipeline Plugin
+- Credentials Plugin
+
+**Step 3: Create Jenkinsfile**
+
+Create `Jenkinsfile` in your agent project root:
+
+```groovy
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = 'my-agent'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        PROJECT_DIR = '/opt/my-agent'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    curl -LsSf https://astral.sh/uv/install.sh | sh
+                    export PATH="$HOME/.cargo/bin:$PATH"
+                    uv sync
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh '''
+                    export PATH="$HOME/.cargo/bin:$PATH"
+                    uv run pytest tests/ -v
+                '''
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                sh '''
+                    export PATH="$HOME/.cargo/bin:$PATH"
+                    uv run ruff check .
+                    uv run mypy .
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh '''
+                    cd ${PROJECT_DIR}
+                    docker-compose down
+                    docker-compose up -d --build
+                    sleep 10
+                    curl -f http://localhost:8000/health || exit 1
+                '''
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh 'docker image prune -f'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment successful!'
+        }
+        failure {
+            echo 'Deployment failed!'
+        }
+    }
+}
+```
+
+**Step 4: Create Jenkins pipeline job**
+
+1. New Item → Pipeline
+2. Configure Git repository URL
+3. Pipeline script from SCM → Git
+4. Save and build
+
+**Step 5: Add credentials to Jenkins**
+
+Manage Jenkins → Credentials → Add Credentials:
+- `LLM_API_KEY`: Secret text
+- `DATABASE_PASSWORD`: Secret text
+- Environment variables in build configuration
+
+---
+
+### Option 3: GitLab CI
+
+GitLab CI is excellent for on-premise with built-in container registry.
+
+**Step 1: Install GitLab Runner**
+
+```bash
+# Install on Ubuntu/Debian
+curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
+sudo apt install gitlab-runner
+
+# Register runner
+sudo gitlab-runner register
+
+# Enter GitLab URL and registration token
+# Choose 'shell' or 'docker' executor
+```
+
+**Step 2: Create GitLab CI configuration**
+
+Create `.gitlab-ci.yml` in your agent project:
+
+```yaml
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE: "my-agent"
+  PROJECT_DIR: "/opt/my-agent"
+
+before_script:
+  - export PATH="$HOME/.cargo/bin:$PATH"
+
+test:
+  stage: test
+  script:
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - uv sync
+    - uv run pytest tests/ -v
+  only:
+    - merge_requests
+    - main
+
+lint:
+  stage: test
+  script:
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - uv sync
+    - uv run ruff check .
+    - uv run mypy .
+  only:
+    - merge_requests
+    - main
+
+build:
+  stage: build
+  script:
+    - docker build -t $DOCKER_IMAGE:$CI_COMMIT_SHA .
+    - docker tag $DOCKER_IMAGE:$CI_COMMIT_SHA $DOCKER_IMAGE:latest
+  only:
+    - main
+
+deploy:
+  stage: deploy
+  script:
+    - cd $PROJECT_DIR
+    - git pull origin main
+    - docker-compose down
+    - docker-compose up -d --build
+    - sleep 10
+    - curl -f http://localhost:8000/health || exit 1
+    - docker image prune -f
+  only:
+    - main
+  environment:
+    name: production
+    url: http://your-server.com
+```
+
+**Step 3: Add CI/CD variables**
+
+GitLab Project → Settings → CI/CD → Variables:
+
+```
+LLM_ENDPOINT_URL=http://localhost:8001/v1
+LLM_API_KEY=your-secret-api-key (masked)
+DATABASE_URL=postgresql://user:pass@localhost:5432/db (masked)
+```
+
+---
+
+### Option 4: Simple Deployment Script
+
+For minimal CI/CD without a platform, create a simple deployment script.
+
+**Create `deploy.sh`:**
+
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 Starting deployment..."
+
+# Configuration
+PROJECT_DIR="/opt/my-agent"
+BACKUP_DIR="/opt/my-agent-backups"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+# Create backup
+echo "📦 Creating backup..."
+mkdir -p $BACKUP_DIR
+docker-compose down
+tar -czf $BACKUP_DIR/backup_$TIMESTAMP.tar.gz -C $PROJECT_DIR .
+
+# Pull latest code
+echo "📥 Pulling latest code..."
+cd $PROJECT_DIR
+git pull origin main
+
+# Install dependencies
+echo "📚 Installing dependencies..."
+uv sync
+
+# Run tests
+echo "🧪 Running tests..."
+uv run pytest tests/ -v || { echo "Tests failed!"; exit 1; }
+
+# Build and deploy
+echo "🏗️ Building Docker image..."
+docker build -t my-agent:latest .
+
+echo "🚀 Deploying services..."
+docker-compose up -d --build
+
+# Wait for health check
+echo "⏳ Waiting for health check..."
+sleep 10
+curl -f http://localhost:8000/health || {
+    echo "Health check failed! Rolling back..."
+    tar -xzf $BACKUP_DIR/backup_$TIMESTAMP.tar.gz -C $PROJECT_DIR
+    docker-compose up -d
+    exit 1
+}
+
+# Cleanup old images
+echo "🧹 Cleaning up..."
+docker image prune -f
+
+# Keep only last 5 backups
+cd $BACKUP_DIR
+ls -t | tail -n +6 | xargs -r rm
+
+echo "✅ Deployment successful!"
+```
+
+**Make it executable:**
+
+```bash
+chmod +x deploy.sh
+```
+
+**Set up cron job for automated deployment:**
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add line to deploy every day at 2 AM
+0 2 * * * cd /opt/my-agent && ./deploy.sh >> /var/log/my-agent-deploy.log 2>&1
+```
+
+**Or use webhook for push-triggered deployment:**
+
+```bash
+# Install webhook
+sudo apt install webhook
+
+# Create webhook configuration (hooks.json)
+cat > hooks.json << 'EOF'
+[
+  {
+    "id": "deploy-agent",
+    "execute-command": "/opt/my-agent/deploy.sh",
+    "command-working-directory": "/opt/my-agent",
+    "pass-arguments-to-command": [],
+    "trigger-rule": {
+      "match": {
+        "type": "payload-hash-sha1",
+        "secret": "your-webhook-secret",
+        "parameter": {
+          "source": "header",
+          "name": "X-Hub-Signature"
+        }
+      }
+    }
+  }
+]
+EOF
+
+# Start webhook server
+webhook -hooks hooks.json -verbose -port 9000
+```
+
+**Configure GitHub webhook:**
+- Repository → Settings → Webhooks → Add webhook
+- Payload URL: `http://your-server:9000/hooks/deploy-agent`
+- Content type: `application/json`
+- Secret: `your-webhook-secret`
+
+---
+
+### CI/CD Best Practices
+
+**1. Environment-Specific Configuration**
+
+Create separate `.env` files:
+```bash
+.env.development
+.env.staging
+.env.production
+```
+
+**2. Health Checks**
+
+Add health endpoint to `app/fast_api_app.py`:
+```python
+@app.get("/health")
+def health():
+    return {"status": "healthy", "version": os.getenv("AGENT_VERSION", "unknown")}
+```
+
+**3. Rolling Deployment**
+
+Use blue-green deployment with Docker:
+```bash
+# Blue environment (current)
+docker-compose -f docker-compose.blue.yml up -d
+
+# Green environment (new version)
+docker-compose -f docker-compose.green.yml up -d
+
+# Switch traffic (nginx/haproxy)
+# If successful, stop blue
+docker-compose -f docker-compose.blue.yml down
+```
+
+**4. Database Migrations**
+
+Run migrations before deployment:
+```bash
+# In CI/CD pipeline
+uv run alembic upgrade head
+```
+
+**5. Monitoring Deployment**
+
+```bash
+# Check deployment status
+docker-compose ps
+
+# View logs
+docker-compose logs -f --tail=100 agent-app
+
+# Monitor resource usage
+docker stats
+```
 
 ---
 
