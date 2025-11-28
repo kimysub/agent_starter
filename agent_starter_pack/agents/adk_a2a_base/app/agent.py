@@ -12,13 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""ADK Agent with Agent2Agent (A2A) Protocol support.
+
+This agent demonstrates how to create an ADK agent that can communicate
+with other agents using the Agent2Agent protocol.
+
+Based on patterns from: https://github.com/a2aproject/a2a-samples
+"""
+
 import datetime
 import os
 from zoneinfo import ZoneInfo
 
 import google.auth
 from google.adk.agents import Agent
-from google.adk.apps.app import App
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
 _, project_id = google.auth.default()
 os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id)
@@ -59,6 +67,7 @@ def get_current_time(query: str) -> str:
     return f"The current time for query {query} is {now.strftime('%Y-%m-%d %H:%M:%S %Z%z')}"
 
 
+# Create ADK agent with A2A protocol support
 root_agent = Agent(
     name="root_agent",
     model="gemini-2.5-flash",
@@ -67,4 +76,6 @@ root_agent = Agent(
     tools=[get_weather, get_current_time],
 )
 
-app = App(root_agent=root_agent, name="app")
+# Convert ADK agent to A2A application
+# This enables the agent to communicate with other agents using the Agent2Agent protocol
+a2a_app = to_a2a(root_agent, port=int(os.getenv("PORT", "8001")))
