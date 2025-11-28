@@ -24,15 +24,25 @@ import datetime
 import os
 from zoneinfo import ZoneInfo
 
-import google.auth
 from google.adk.agents import Agent
+from google.adk.models.lite_llm import LiteLlm
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
-_, project_id = google.auth.default()
-os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id)
-os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
-os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "True")
+from dotenv import load_dotenv
+load_dotenv()
 
+# Get LLM configuration from environment variables
+llm_endpoint = os.getenv("LLM_ENDPOINT_URL", "http://localhost:8001/v1")
+llm_model = os.getenv("LLM_MODEL_NAME", "openai/llama-3.1-8b")
+llm_api_key = os.getenv("LLM_API_KEY", "not-needed")
+
+# Use ADK's built-in LiteLLM support!
+# LiteLlm supports 100+ providers: OpenAI, Anthropic, vLLM, Ollama, X.AI, etc.
+llm = LiteLlm(
+    model=llm_model,
+    api_key=llm_api_key,
+    api_base=llm_endpoint,
+)
 
 def get_weather(query: str) -> str:
     """Simulates a web search. Use it get information on weather.
@@ -70,7 +80,7 @@ def get_current_time(query: str) -> str:
 # Create ADK agent with A2A protocol support
 root_agent = Agent(
     name="root_agent",
-    model="gemini-2.5-flash",
+    model=llm,
     description="An agent that can provide information about the weather and time.",
     instruction="You are a helpful AI assistant designed to provide accurate and useful information.",
     tools=[get_weather, get_current_time],
