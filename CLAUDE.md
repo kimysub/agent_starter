@@ -14,6 +14,7 @@ Key capabilities:
 - ✅ **Agent2Agent Protocol**: Full A2A support using `google.adk.a2a.utils.agent_to_a2a`
 - ✅ **LiteLLM Integration**: Works with 100+ providers (OpenAI, vLLM, Ollama, X.AI, etc.)
 - ✅ **Environment-based Configuration**: Uses `.env` files with `python-dotenv`
+- ✅ **REST API**: Programmatic agent generation via HTTP API (`agent-starter-pack-api`)
 - 🚧 Storage, vector databases, and observability in progress
 
 ## Development Commands
@@ -65,6 +66,15 @@ make docs-dev
 ```bash
 # Test creating a project from templates
 uv run agent-starter-pack create myagent-$(date +%s) --output-dir target
+```
+
+### API Server
+```bash
+# Run the API server
+uv run agent-starter-pack-api
+
+# API will be available at http://localhost:8080
+# Interactive docs at http://localhost:8080/docs
 ```
 
 ## Architecture
@@ -119,6 +129,14 @@ The project uses a 4-layer template architecture where later layers override ear
   - `gcp.py` - Google Cloud Platform interactions
   - `cicd.py` - CI/CD setup utilities
   - `remote_template.py` - Remote template fetching
+
+### API Structure
+
+- `agent_starter_pack/api/main.py` - FastAPI application entrypoint
+- `agent_starter_pack/api/models.py` - Pydantic request/response models
+- `agent_starter_pack/api/generator.py` - Agent code generation logic
+- `agent_starter_pack/api/run.py` - API server startup script
+- `agent_starter_pack/api/README.md` - API documentation and examples
 
 ## On-Premise Deployment (Partially Complete)
 
