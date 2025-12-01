@@ -89,3 +89,4 @@ root_agent = Agent(
 # Convert ADK agent to A2A application
 # This enables the agent to communicate with other agents using the Agent2Agent protocol
 a2a_app = to_a2a(root_agent, port=int(os.getenv("PORT", "8001")))
+app = a2a_app
