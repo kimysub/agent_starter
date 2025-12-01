@@ -17,6 +17,8 @@ dependencies = [
     "backoff>=2.2.1",
     "tomli>=1.1.0; python_version < \"3.11\"",
     "requests>=2.31.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
 ]
 
 [dependency-groups]
@@ -71,7 +73,7 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-include = ["agent_starter_pack/cli/**/*.py", "tests/**/*.py"]
+include = ["agent_starter_pack/cli/**/*.py", "agent_starter_pack/api/**/*.py", "tests/**/*.py"]
 exclude = ["./agent_starter_pack/agents/**/*.py", "./tests/cicd/scripts/**/*.py"]
 
 [tool.ruff.lint]
@@ -122,6 +124,7 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 agent-starter-pack = "agent_starter_pack.cli.main:cli"
+agent-starter-pack-api = "agent_starter_pack.api.run:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent_starter_pack", "llm.txt"]
