@@ -604,18 +604,19 @@ This document provides a comprehensive checklist for migrating the Agent Starter
 
 ### 8.4 REST API for Programmatic Access ✅ COMPLETED
 
-- [x] **Create REST API for agent code generation** ✅ COMPLETE
+- [x] **Create REST API for complete project generation with GitHub integration** ✅ COMPLETE
   - **New directory**: `agent_starter_pack/api/`
   - **Files created**:
     - [x] `agent_starter_pack/api/main.py` - FastAPI application with CORS support
     - [x] `agent_starter_pack/api/models.py` - Pydantic request/response models
-    - [x] `agent_starter_pack/api/generator.py` - Agent code generation logic
+    - [x] `agent_starter_pack/api/project_generator.py` - Complete project generation logic
+    - [x] `agent_starter_pack/api/github_helper.py` - GitHub API integration
     - [x] `agent_starter_pack/api/run.py` - API server startup script
     - [x] `agent_starter_pack/api/README.md` - API documentation and examples
-    - [x] `docs/API_MANUAL.md` - Complete user manual with integration examples
+    - [x] `docs/GITHUB_INTEGRATION.md` - Complete GitHub integration guide
   - **Files modified**:
     - [x] `pyproject.toml`
-      - [x] Added `fastapi>=0.115.0` and `uvicorn[standard]>=0.34.0` dependencies
+      - [x] Added `fastapi>=0.115.0`, `uvicorn[standard]>=0.34.0`, `requests>=2.32.0` dependencies
       - [x] Added `agent-starter-pack-api` CLI command
       - [x] Added API directory to ruff linting
     - [x] `CLAUDE.md`
@@ -623,12 +624,16 @@ This document provides a comprehensive checklist for migrating the Agent Starter
       - [x] Added API server section to Development Commands
       - [x] Added API Structure section to Architecture
   - **API Features**:
-    - ✅ Simple REST endpoint: `POST /api/v1/generate/agent`
-    - ✅ Customizable: Custom tools/functions and environment variables
-    - ✅ Public API: No authentication required
-    - ✅ CORS enabled: Works with web frontends
-    - ✅ Self-documenting: Built-in Swagger UI at `/docs`
-    - ✅ Health check: `GET /health` endpoint
+    - ✅ **Full Project Generation**: Creates complete agent projects (not just code)
+    - ✅ **Zip Downloads**: Returns downloadable zip files
+    - ✅ **GitHub Integration**: Creates repositories on GitHub.com or GitHub Enterprise
+    - ✅ **Simple UI Inputs**: Agent name, description, prompt, tools
+    - ✅ **Custom Tools**: Generates tool stubs from name/description
+    - ✅ **Organization Support**: Create repos in GitHub organizations
+    - ✅ **Public/Private Repos**: Configurable repository visibility
+    - ✅ **CORS Enabled**: Works with web frontends
+    - ✅ **Self-documenting**: Built-in Swagger UI at `/docs`
+    - ✅ **Health Check**: `GET /health` endpoint
   - **Usage**:
     ```bash
     # Start API server
@@ -636,40 +641,59 @@ This document provides a comprehensive checklist for migrating the Agent Starter
     # Server at http://localhost:8080
     # Docs at http://localhost:8080/docs
 
-    # Generate agent code
-    curl -X POST http://localhost:8080/api/v1/generate/agent \
+    # Generate project with GitHub repo
+    export GITHUB_TOKEN=ghp_your_token_here
+    curl -X POST http://localhost:8080/api/v1/generate/project \
       -H "Content-Type: application/json" \
-      -d '{"project_name": "my-agent", "agent_type": "adk_a2a_base"}'
+      -d '{
+        "agent_name": "my-agent",
+        "description": "My helpful agent",
+        "prompt": "You assist users",
+        "create_git_repo": true,
+        "repo_private": true
+      }'
     ```
   - **Request Schema**:
-    - `project_name`: Agent project name
-    - `agent_type`: `adk_a2a_base` or `adk_base`
-    - `tools`: List of custom tool definitions (name, description, parameters, implementation)
-    - `env_vars`: List of environment variables (name, default_value, description)
-    - `agent_description`: Optional agent description
-    - `agent_instruction`: Optional system instruction
+    - `agent_name`: Agent project name (required)
+    - `description`: Agent description (required)
+    - `prompt`: System instruction/prompt (required)
+    - `tools`: List of tools with name and description (optional)
+    - `create_git_repo`: Whether to create GitHub repository (default: false)
+    - `git_repo_name`: Custom repository name (optional)
+    - `github_token`: GitHub PAT (optional, can use env var)
+    - `github_org`: GitHub organization name (optional)
+    - `github_enterprise_url`: GitHub Enterprise URL (optional)
+    - `repo_private`: Public or private repository (default: true)
   - **Response Schema**:
-    - `code`: Generated agent.py code
-    - `filename`: Suggested filename (agent.py)
-    - `agent_type`: Agent type used
+    - `project_name`: Name of generated project
+    - `download_url`: URL to download zip file
+    - `git_repo_url`: GitHub repository URL (if created)
+    - `files_generated`: Number of files in project
+    - `message`: Success message
   - **Use Cases Enabled**:
-    - ✅ Web frontends: Build visual agent builders
+    - ✅ Web frontends: Build visual agent builders with download + GitHub integration
     - ✅ IDE plugins: VSCode, JetBrains extensions
-    - ✅ CI/CD automation: Generate agents in pipelines
-    - ✅ Learning platforms: Interactive agent creation
+    - ✅ CI/CD automation: Generate and deploy agents in pipelines
+    - ✅ Learning platforms: Interactive agent creation with instant GitHub repos
     - ✅ Custom tools: Integrate into existing workflows
   - **Documentation**:
     - [x] Developer docs: `agent_starter_pack/api/README.md`
-    - [x] User manual: `docs/API_MANUAL.md` (with Python, JavaScript, React examples)
+    - [x] GitHub integration guide: `docs/GITHUB_INTEGRATION.md`
     - [x] Interactive docs: Available at `/docs` when server is running
   - **Testing Results**:
     - ✅ Health endpoint: Returns `{"status": "healthy"}`
-    - ✅ Basic generation: Generates 2906 bytes of valid agent.py code
-    - ✅ Custom tools: Successfully includes custom functions
-    - ✅ Custom env vars: Successfully includes environment variables
+    - ✅ Basic project generation: Creates complete project with 23 files
+    - ✅ Custom tools: Successfully generates tool stubs
+    - ✅ Zip download: Creates downloadable zip archives
+    - ✅ GitHub.com repos: Successfully creates repositories
+    - ✅ GitHub organizations: Successfully creates in specified org
+    - ✅ GitHub Enterprise: Supports custom GitHub Enterprise URLs
+    - ✅ Token authentication: Works with both env var and request parameter
   - **Production Ready**:
-    - ✅ Docker deployment example included
     - ✅ CORS configured for cross-origin requests
+    - ✅ Proper error handling with HTTP status codes
+    - ✅ Token security via environment variables
+    - ✅ Subprocess-based project generation (avoids import issues)
     - ✅ Error handling with proper HTTP status codes
     - ✅ Pydantic validation for all inputs
 
