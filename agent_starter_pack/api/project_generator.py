@@ -14,10 +14,10 @@
 
 """Full project generation logic for API."""
 
-import os
+import re
 import shutil
 import subprocess
-import tempfile
+import sys
 from pathlib import Path
 
 from .models import GenerateProjectRequest, ToolInfo
@@ -47,8 +47,10 @@ def {tool.name}(query: str) -> str:
 '''
 
 
-def generate_project(request: GenerateProjectRequest, output_dir: Path) -> tuple[Path, int]:
-    """Generate a complete agent project.
+def generate_project(
+    request: GenerateProjectRequest, output_dir: Path
+) -> tuple[Path, int]:
+    """Generate a complete agent project using CLI.
 
     Args:
         request: Project generation request from UI
@@ -59,41 +61,29 @@ def generate_project(request: GenerateProjectRequest, output_dir: Path) -> tuple
     """
     project_path = output_dir / request.agent_name
 
-    # Use CLI to create project
-    from agent_starter_pack.cli.commands.create import create_agent_project
-    from agent_starter_pack.cli.utils.template import get_available_agents
+    # Call CLI command via subprocess
+    cmd = [
+        sys.executable,
+        "-m",
+        "agent_starter_pack.cli.main",
+        "create",
+        request.agent_name,
+        "--output-dir",
+        str(output_dir),
+        "--agent",
+        "adk_a2a_base",
+        "--deployment-target",
+        "on_premise",
+        "--auto-approve",
+        "--skip-checks",
+    ]
 
-    # Get agent info
-    agents = get_available_agents()
-    if "adk_a2a_base" not in agents:
-        raise ValueError("adk_a2a_base agent not available")
+    result = subprocess.run(cmd, capture_output=True, text=True)
 
-    agent_info = agents["adk_a2a_base"]
-
-    # Create cookiecutter context
-    cookiecutter_context = {
-        "project_name": request.agent_name,
-        "agent_name": "adk_a2a_base",
-        "deployment_target": "on_premise",
-        "session_type": "in_memory",
-        "agent_directory": "app",
-    }
-
-    # Create project using cookiecutter
-    import cookiecutter.main
-    from cookiecutter.exceptions import RepositoryCloneFailed
-
-    agent_template_path = Path(__file__).parent.parent / "agents" / "adk_a2a_base"
-
-    try:
-        cookiecutter.main.cookiecutter(
-            str(agent_template_path),
-            extra_context=cookiecutter_context,
-            output_dir=str(output_dir),
-            no_input=True,
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to create project: {result.stderr or result.stdout}"
         )
-    except Exception as e:
-        raise RuntimeError(f"Failed to create project: {e}") from e
 
     # Customize agent.py with user's description, prompt, and tools
     agent_py_path = project_path / "app" / "agent.py"
@@ -117,16 +107,14 @@ def customize_agent_file(agent_py_path: Path, request: GenerateProjectRequest) -
     content = agent_py_path.read_text(encoding="utf-8")
 
     # Replace description
-    content = content.replace(
-        'description="An agent that can provide information about the weather and time."',
-        f'description="{request.description}"',
-    )
+    old_desc = 'description="An agent that can provide information about the weather and time."'
+    new_desc = f'description="{request.description}"'
+    content = content.replace(old_desc, new_desc)
 
     # Replace instruction/prompt
-    content = content.replace(
-        'instruction="You are a helpful AI assistant designed to provide accurate and useful information."',
-        f'instruction="{request.prompt}"',
-    )
+    old_instruction = 'instruction="You are a helpful AI assistant designed to provide accurate and useful information."'
+    new_instruction = f'instruction="{request.prompt}"'
+    content = content.replace(old_instruction, new_instruction)
 
     # If tools are provided, add them
     if request.tools:
@@ -141,21 +129,27 @@ def customize_agent_file(agent_py_path: Path, request: GenerateProjectRequest) -
         agent_creation_marker = "# Create ADK agent"
         if agent_creation_marker in content:
             parts = content.split(agent_creation_marker)
-            # Remove default tools (get_weather, get_current_time)
-            # by finding the section between llm creation and agent creation
-            llm_section_end = parts[0].rfind(")\n\n") + 3  # After llm = LiteLlm(...)
-            parts[0] = parts[0][:llm_section_end]
 
-            # Insert new tools
-            parts[0] += "\n".join(tool_functions) + "\n\n"
+            # Find the llm creation section
+            llm_end_pattern = r"llm = LiteLlm\([^)]+\)\n"
+            llm_match = re.search(llm_end_pattern, parts[0], re.DOTALL)
+            if llm_match:
+                llm_section_end = llm_match.end()
+                # Keep everything up to and including llm creation
+                parts[0] = parts[0][:llm_section_end]
 
-            # Update tools list in Agent creation
-            tools_list_str = ", ".join(tool_names)
-            parts[1] = parts[1].replace(
-                "tools=[get_weather, get_current_time]", f"tools=[{tools_list_str}]"
-            )
+                # Insert new tools
+                parts[0] += "\n" + "\n".join(tool_functions) + "\n\n"
 
-            content = agent_creation_marker.join(parts)
+                # Update tools list in Agent creation
+                tools_list_str = ", ".join(tool_names)
+                parts[1] = re.sub(
+                    r"tools=\[get_weather, get_current_time\]",
+                    f"tools=[{tools_list_str}]",
+                    parts[1],
+                )
+
+                content = agent_creation_marker.join(parts)
 
     # Write back
     agent_py_path.write_text(content, encoding="utf-8")
@@ -186,10 +180,7 @@ def create_git_repository(
     try:
         # Initialize git repo
         subprocess.run(
-            ["git", "init"],
-            cwd=project_path,
-            check=True,
-            capture_output=True,
+            ["git", "init"], cwd=project_path, check=True, capture_output=True
         )
 
         # Configure git (use generic name/email)
@@ -208,10 +199,7 @@ def create_git_repository(
 
         # Add all files
         subprocess.run(
-            ["git", "add", "."],
-            cwd=project_path,
-            check=True,
-            capture_output=True,
+            ["git", "add", "."], cwd=project_path, check=True, capture_output=True
         )
 
         # Create initial commit
