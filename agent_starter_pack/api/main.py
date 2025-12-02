@@ -31,7 +31,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .models import GenerateProjectRequest, GenerateProjectResponse
-from .project_generator import create_git_repository, create_zip_archive, generate_project
+from .project_generator import create_zip_archive, generate_project, push_to_github_folder
 
 app = FastAPI(
     title="Agent Starter Pack API",
@@ -140,16 +140,30 @@ async def generate_agent_project(
         # Create download URL
         download_url = f"/downloads/{zip_name}.zip"
 
-        # Optionally create Git repository
+        # Optionally push to GitHub repository folder
         git_repo_url = None
+        git_folder_name = None
         if request.create_git_repo:
-            repo_name = request.git_repo_name or request.agent_name
-            git_repo_url = create_git_repository(project_path, repo_name)
+            if not request.git_repo_name:
+                raise HTTPException(
+                    status_code=400,
+                    detail="git_repo_name is required when create_git_repo is true",
+                )
+
+            git_folder_name, git_repo_url = push_to_github_folder(
+                project_path=project_path,
+                agent_name=request.agent_name,
+                repo_name=request.git_repo_name,
+                github_token=request.github_token,
+                github_org=request.github_org,
+                github_enterprise_url=request.github_enterprise_url,
+            )
 
         return GenerateProjectResponse(
             project_name=request.agent_name,
             download_url=download_url,
             git_repo_url=git_repo_url,
+            git_folder_name=git_folder_name,
             files_generated=file_count,
             message=f"Project '{request.agent_name}' generated successfully!",
         )

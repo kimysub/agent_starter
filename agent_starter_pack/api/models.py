@@ -34,10 +34,22 @@ class GenerateProjectRequest(BaseModel):
         default_factory=list, description="List of tools the agent should have"
     )
     create_git_repo: bool = Field(
-        default=False, description="Whether to create a Git repository"
+        default=False, description="Whether to push to GitHub repository"
     )
     git_repo_name: str | None = Field(
-        None, description="Git repository name (if create_git_repo is True)"
+        None,
+        description="Fixed GitHub repository name to push to (e.g., 'agents-collection'). Agent will be pushed to a numbered folder within this repo.",
+    )
+    github_token: str | None = Field(
+        None,
+        description="GitHub Personal Access Token (optional, can use GITHUB_TOKEN env var)",
+    )
+    github_org: str | None = Field(
+        None,
+        description="GitHub organization name (optional, defaults to user account)",
+    )
+    github_enterprise_url: str | None = Field(
+        None, description="GitHub Enterprise URL (optional, defaults to github.com)"
     )
 
 
@@ -47,7 +59,10 @@ class GenerateProjectResponse(BaseModel):
     project_name: str = Field(..., description="Name of the generated project")
     download_url: str = Field(..., description="URL to download zip file")
     git_repo_url: str | None = Field(
-        None, description="Git repository URL (if created)"
+        None, description="GitHub repository URL with folder path (if pushed to GitHub)"
+    )
+    git_folder_name: str | None = Field(
+        None, description="Folder name in the repository (e.g., 'my-agent-0042')"
     )
     files_generated: int = Field(..., description="Number of files generated")
     message: str = Field(..., description="Success message")

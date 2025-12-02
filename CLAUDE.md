@@ -134,9 +134,11 @@ The project uses a 4-layer template architecture where later layers override ear
 
 - `agent_starter_pack/api/main.py` - FastAPI application entrypoint
 - `agent_starter_pack/api/models.py` - Pydantic request/response models
-- `agent_starter_pack/api/generator.py` - Agent code generation logic
+- `agent_starter_pack/api/project_generator.py` - Complete project generation logic
+- `agent_starter_pack/api/github_helper.py` - GitHub repository creation and push
 - `agent_starter_pack/api/run.py` - API server startup script
 - `agent_starter_pack/api/README.md` - API documentation and examples
+- `docs/GITHUB_INTEGRATION.md` - GitHub integration guide
 
 ## On-Premise Deployment (Partially Complete)
 
